@@ -8,7 +8,7 @@ class AppDelegate : UIResponder, UIApplicationDelegate {
   
   func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
     configureNeonAppearance()
-    ServiceManager.shared.application(application, didFinishLaunchingWithOptions: launchOptions)
+    return ServiceManager.shared.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
   private func configureNeonAppearance() {

@@ -22,24 +22,6 @@ jobs:
             scheme: DiOS (NJB)
             archive_name: NonJailbroken
             output_name: DiOS-Non-Jailbroken.ipa
-          - beta: false
-            variant: trollstore
-            configuration: Release (TrollStore)
-            scheme: DiOS (JB)
-            archive_name: TrollStore
-            output_name: DiOS-TrollStore.tipa
-          - beta: true
-            variant: njb
-            configuration: Release (Beta, Non-Jailbroken)
-            scheme: DiOS (NJB)
-            archive_name: NonJailbroken-Beta
-            output_name: DiOS-Non-Jailbroken-Beta.ipa
-          - beta: true
-            variant: trollstore
-            configuration: Release (Beta, TrollStore)
-            scheme: DiOS (JB)
-            archive_name: TrollStore-Beta
-            output_name: DiOS-TrollStore-Beta.tipa
 
     env:
       XCODE_COMMON_BUILD_ARGS: -project Source/iOS/App/DolphiniOS.xcodeproj -derivedDataPath "${{ github.workspace }}/build-Xcode" -sdk iphoneos -destination generic/platform=iOS DOL_PBID_ORGANIZATION_IDENTIFIER="me.${{ github.repository_owner }}" DOL_BUILD_SOURCE="development" CODE_SIGNING_ALLOWED="NO" CODE_SIGNING_REQUIRED="NO"
