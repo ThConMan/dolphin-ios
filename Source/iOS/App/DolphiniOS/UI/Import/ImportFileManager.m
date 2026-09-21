@@ -50,6 +50,28 @@
   UIWindowScene* mainScene = [MainSceneCoordinator shared].mainScene;
   
   if (mainScene == nil) {
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+      if ([scene isKindOfClass:[UIWindowScene class]] &&
+          scene.activationState == UISceneActivationStateForegroundActive) {
+        mainScene = (UIWindowScene*)scene;
+        break;
+      }
+    }
+  }
+
+  if (mainScene == nil) {
+    UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error")
+      message:@"DolphiniOS could not find the active app window to import this file. Return to the game list and try again."
+      preferredStyle:UIAlertControllerStyleAlert];
+    [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+      if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState != UISceneActivationStateUnattached) {
+        UIWindowScene* sceneToUse = (UIWindowScene*)scene;
+        UIViewController* presenter = sceneToUse.keyWindow.rootViewController;
+        [presenter presentViewController:errorAlert animated:true completion:nil];
+        break;
+      }
+    }
     return;
   }
   
