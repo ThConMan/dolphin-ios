@@ -141,13 +141,22 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
 }
 
 - (void)openDocumentPickerWithSoftwareContentTypesAndPickerType:(DOLSoftwareListDocumentPickerType)pickerType {
-  NSArray<UTType*>* types = @[
+  NSMutableArray<UTType*>* types = [NSMutableArray arrayWithArray:@[
     [UTType exportedTypeWithIdentifier:@"me.oatmealdome.dolphinios.generic-software"],
     [UTType exportedTypeWithIdentifier:@"me.oatmealdome.dolphinios.gamecube-software"],
     [UTType exportedTypeWithIdentifier:@"me.oatmealdome.dolphinios.wii-software"]
-  ];
+  ]];
+
+  // Files.app and cloud providers do not always resolve our custom UTIs for
+  // disc images. Add the concrete extensions so ISO/RVZ files remain visible.
+  for (NSString* extension in @[@"iso", @"rvz", @"gcm", @"gcz", @"wia", @"wbfs", @"ciso", @"wad", @"dol", @"elf"]) {
+    UTType* type = [UTType typeWithFilenameExtension:extension];
+    if (type != nil) {
+      [types addObject:type];
+    }
+  }
   
-  [self openDocumentPickerWithContentTypes:types pickerType:pickerType];
+  [self openDocumentPickerWithContentTypes:[types copy] pickerType:pickerType];
 }
 
 - (void)openDocumentPickerWithContentTypes:(NSArray<UTType*>*)contentTypes pickerType:(DOLSoftwareListDocumentPickerType)pickerType {
@@ -174,6 +183,11 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
     
     [self presentViewController:errorAlert animated:true completion:nil];
   };
+
+  if (urls.count == 0) {
+    showError(@"No software file was selected.");
+    return;
+  }
   
   if (_pickerType == DOLSoftwareListDocumentPickerTypeImportSoftware) {
     [[ImportFileManager shared] importFileAtUrl:urls[0]];
