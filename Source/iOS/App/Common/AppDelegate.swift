@@ -7,7 +7,19 @@ class AppDelegate : UIResponder, UIApplicationDelegate {
   var window: UIWindow?
   
   func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    configureNeonAppearance()
     ServiceManager.shared.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func configureNeonAppearance() {
+    let cyan = UIColor(red: 0.10, green: 0.86, blue: 1.00, alpha: 1.0)
+    let magenta = UIColor(red: 1.00, green: 0.18, blue: 0.78, alpha: 1.0)
+
+    UINavigationBar.appearance().tintColor = cyan
+    UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.white]
+    UITabBar.appearance().tintColor = cyan
+    UISwitch.appearance().onTintColor = magenta
+    UIButton.appearance().tintColor = cyan
   }
   
   func applicationWillTerminate(_ application: UIApplication) {
