@@ -2,3 +2,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 DOL_APP_ICON_ASSET_NAME = AppIcon_Glass
+DOL_APP_ICON_ASSET_NAME[config=Debug (Non-Jailbroken)] = AppIcon
+DOL_APP_ICON_ASSET_NAME[config=Release (Non-Jailbroken)] = AppIcon
