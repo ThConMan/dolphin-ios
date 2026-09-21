@@ -38,7 +38,7 @@ private let kStikJITFolderName = "StikJIT"
          let mode = JITLaunchMode(rawValue: value.intValue) {
         return mode == .builtInStikJIT && isRunningInLiveContainer ? .waitForDebugger : mode
       }
-      let migratedMode: JITLaunchMode = UserDefaults.standard.bool(forKey: kSelfEnableJitDefaultsKey) ? .builtInStikJIT : .waitForDebugger
+      let migratedMode: JITLaunchMode = UserDefaults.standard.bool(forKey: kSelfEnableJitDefaultsKey) || hasPairingFile ? .builtInStikJIT : .waitForDebugger
       return migratedMode == .builtInStikJIT && isRunningInLiveContainer ? .waitForDebugger : migratedMode
     }
     set { UserDefaults.standard.set(newValue.rawValue, forKey: kJITLaunchModeDefaultsKey) }
