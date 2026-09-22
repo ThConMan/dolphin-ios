@@ -13,7 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (ImportFileManager*)shared;
 
-- (void)importFileAtUrl:(NSURL*)url presentingViewController:(UIViewController*)presenter;
+// Consumes the local copy returned by a document picker configured with asCopy:YES.
+- (void)importCopiedFileAtUrl:(NSURL*)url presentingViewController:(UIViewController*)presenter;
 
 @end
 

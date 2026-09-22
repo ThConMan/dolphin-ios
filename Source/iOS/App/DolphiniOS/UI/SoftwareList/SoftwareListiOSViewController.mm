@@ -160,7 +160,9 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
 }
 
 - (void)openDocumentPickerWithContentTypes:(NSArray<UTType*>*)contentTypes pickerType:(DOLSoftwareListDocumentPickerType)pickerType {
-  UIDocumentPickerViewController* pickerController = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes];
+  // Import mode lets Files download cloud documents before handing us a local copy.
+  BOOL importCopy = pickerType == DOLSoftwareListDocumentPickerTypeImportSoftware;
+  UIDocumentPickerViewController* pickerController = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:importCopy];
   pickerController.delegate = self;
   pickerController.modalPresentationStyle = UIModalPresentationPageSheet;
   pickerController.allowsMultipleSelection = false;
@@ -192,7 +194,7 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
   if (_pickerType == DOLSoftwareListDocumentPickerTypeImportSoftware) {
     NSLog(@"[Import] Files picker returned %lu URL(s)", (unsigned long)urls.count);
     void (^startImport)(void) = ^{
-      [[ImportFileManager shared] importFileAtUrl:urls[0] presentingViewController:self];
+      [[ImportFileManager shared] importCopiedFileAtUrl:urls[0] presentingViewController:self];
     };
     if (controller.isBeingDismissed && controller.transitionCoordinator != nil) {
       [controller.transitionCoordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
