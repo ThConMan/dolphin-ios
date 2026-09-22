@@ -5,13 +5,9 @@
 
 #import "Swift.h"
 
-#import "GameFileCacheManager.h"
 #import "LocalizationUtil.h"
-#import "MainSceneCoordinator.h"
 
-@implementation ImportFileManager {
-  UIWindow* _window;
-}
+@implementation ImportFileManager
 
 + (ImportFileManager*)shared {
   static ImportFileManager* sharedInstance = nil;
@@ -24,140 +20,90 @@
   return sharedInstance;
 }
 
-- (void)showWindowOnScene:(UIWindowScene*)scene {
-  self->_window = [[UIWindow alloc] initWithWindowScene:scene];
-  self->_window.frame = [UIScreen mainScreen].bounds;
-  self->_window.rootViewController = [[UIViewController alloc] init];
-  self->_window.windowLevel = UIWindowLevelAlert;
-  
-  UIWindow* topWindow = scene.windows.lastObject;
-  self->_window.windowLevel = topWindow.windowLevel + 1;
-  
-  [self->_window makeKeyAndVisible];
-}
+- (void)importFileAtUrl:(NSURL*)url presentingViewController:(UIViewController*)presenter {
+  // Files already inside our sandbox do not require a security scope.
+  BOOL accessingScopedResource = [url startAccessingSecurityScopedResource];
+  NSLog(@"[Import] Starting import; security scope acquired: %@", accessingScopedResource ? @"YES" : @"NO");
 
-- (void)hideWindow {
-  [self->_window setHidden:true];
-  
-  self->_window = nil;
-}
-
-- (void)presentViewControllerOnWindow:(UIViewController*)controller {
-  [self->_window.rootViewController presentViewController:controller animated:true completion:nil];
-}
-
-- (void)importFileAtUrl:(NSURL*)url {
-  UIWindowScene* mainScene = [MainSceneCoordinator shared].mainScene;
-  
-  if (mainScene == nil) {
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-      if ([scene isKindOfClass:[UIWindowScene class]] &&
-          scene.activationState == UISceneActivationStateForegroundActive) {
-        mainScene = (UIWindowScene*)scene;
-        break;
-      }
+  void (^finish)(void) = ^{
+    if (accessingScopedResource) {
+      [url stopAccessingSecurityScopedResource];
     }
-  }
-
-  if (mainScene == nil) {
-    UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error")
-      message:@"DolphiniOS could not find the active app window to import this file. Return to the game list and try again."
-      preferredStyle:UIAlertControllerStyleAlert];
-    [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-      if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState != UISceneActivationStateUnattached) {
-        UIWindowScene* sceneToUse = (UIWindowScene*)scene;
-        UIViewController* presenter = sceneToUse.keyWindow.rootViewController;
-        [presenter presentViewController:errorAlert animated:true completion:nil];
-        break;
-      }
-    }
-    return;
-  }
-  
-  [self showWindowOnScene:mainScene];
-  
-  if (![url startAccessingSecurityScopedResource]) {
-    UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error") message:@"Failed to start accessing security scoped resource." preferredStyle:UIAlertControllerStyleAlert];
-    
-    [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault
-      handler:^(UIAlertAction* action) {
-      [self hideWindow];
-    }]];
-    
-    [self presentViewControllerOnWindow:errorAlert];
-    
-    return;
-  }
-  
-  void (^finish)(void) = ^void() {
-    [url stopAccessingSecurityScopedResource];
-    
-    [self hideWindow];
-    
     [[NSNotificationCenter defaultCenter] postNotificationName:DOLImportFileFinishedNotification object:self userInfo:nil];
   };
-  
-  NSString* sourcePath = [url path];
-  NSString* destinationPath = [[UserFolderUtil getSoftwareFolder] stringByAppendingPathComponent:[sourcePath lastPathComponent]];
-  
+
+  void (^showError)(NSString*) = ^(NSString* message) {
+    UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error") message:message preferredStyle:UIAlertControllerStyleAlert];
+    [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
+    [presenter presentViewController:errorAlert animated:true completion:nil];
+  };
+
+  NSURL* destinationUrl = [[NSURL fileURLWithPath:[UserFolderUtil getSoftwareFolder] isDirectory:YES] URLByAppendingPathComponent:url.lastPathComponent];
   NSFileManager* fileManager = [NSFileManager defaultManager];
-  
-  if ([fileManager fileExistsAtPath:destinationPath]) {
-    UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error") message:@"This software has already been imported." preferredStyle:UIAlertControllerStyleAlert];
-    
-    [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault
-      handler:^(UIAlertAction* action) {
-      finish();
-    }]];
-    
-    [self presentViewControllerOnWindow:errorAlert];
-    
+
+  if ([fileManager fileExistsAtPath:destinationUrl.path]) {
+    finish();
+    showError(@"This software has already been imported.");
     return;
   }
-  
-  UIAlertController* alert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Import") message:nil preferredStyle:UIAlertControllerStyleAlert];
 
-  [alert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"Copy") style:UIAlertActionStyleDefault
-    handler:^(UIAlertAction* action) {
-    NSError* error = nil;
-    if (![fileManager copyItemAtPath:sourcePath toPath:destinationPath error:&error]) {
-      UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error") message:[NSString stringWithFormat:@"The copy operation failed.\n\n%@", error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
-      
-      [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault
-        handler:^(UIAlertAction* action) {
-        finish();
-      }]];
-      
-      [self presentViewControllerOnWindow:errorAlert];
-    } else {
-      finish();
-    }
+  UIAlertController* alert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Import") message:url.lastPathComponent preferredStyle:UIAlertControllerStyleAlert];
+
+  void (^transfer)(BOOL) = ^(BOOL move) {
+    // Wait for the choice alert to leave before presenting progress or errors.
+    [presenter dismissViewControllerAnimated:true completion:^{
+      UIAlertController* progress = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Import") message:@"Importing software. This may take a while for large files or cloud downloads." preferredStyle:UIAlertControllerStyleAlert];
+      [presenter presentViewController:progress animated:true completion:^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+          NSError* coordinationError = nil;
+          __block NSError* operationError = nil;
+          __block BOOL succeeded = NO;
+          NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+
+          if ([fileManager createDirectoryAtURL:destinationUrl.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:&operationError]) {
+            if (move) {
+              [coordinator coordinateWritingItemAtURL:url options:NSFileCoordinatorWritingForMoving writingItemAtURL:destinationUrl options:0 error:&coordinationError byAccessor:^(NSURL* source, NSURL* destination) {
+                [coordinator itemAtURL:source willMoveToURL:destination];
+                succeeded = [fileManager moveItemAtURL:source toURL:destination error:&operationError];
+                if (succeeded) {
+                  [coordinator itemAtURL:source didMoveToURL:destination];
+                }
+              }];
+            } else {
+              [coordinator coordinateReadingItemAtURL:url options:NSFileCoordinatorReadingWithoutChanges writingItemAtURL:destinationUrl options:0 error:&coordinationError byAccessor:^(NSURL* source, NSURL* destination) {
+                succeeded = [fileManager copyItemAtURL:source toURL:destination error:&operationError];
+              }];
+            }
+          }
+
+          NSError* error = coordinationError ?: operationError;
+          NSLog(@"[Import] %@ finished: %@ (error domain: %@, code: %ld)", move ? @"Move" : @"Copy", succeeded ? @"success" : @"failure", error.domain, (long)error.code);
+          dispatch_async(dispatch_get_main_queue(), ^{
+            [progress dismissViewControllerAnimated:true completion:^{
+              finish();
+              if (!succeeded) {
+                showError([NSString stringWithFormat:@"The import failed.\n\n%@", error.localizedDescription ?: @"The selected file could not be read. Try downloading it in Files first."]);
+              }
+            }];
+          });
+        });
+      }];
+    }];
+  };
+
+  [alert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"Copy") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+    transfer(NO);
   }]];
-  
-  [alert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"Move") style:UIAlertActionStyleDefault
-    handler:^(UIAlertAction* action) {
-    NSError* error = nil;
-    if (![fileManager moveItemAtPath:sourcePath toPath:destinationPath error:&error]) {
-      UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:DOLCoreLocalizedString(@"Error") message:[NSString stringWithFormat:@"The move operation failed.\n\n%@", error.localizedDescription] preferredStyle:UIAlertControllerStyleAlert];
-      
-      [errorAlert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"OK") style:UIAlertActionStyleDefault
-        handler:^(UIAlertAction* action) {
-        finish();
-      }]];
-      
-      [self presentViewControllerOnWindow:errorAlert];
-    } else {
-      finish();
-    }
+  [alert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"Move") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+    transfer(YES);
   }]];
-  
-  [alert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"Cancel") style:UIAlertActionStyleCancel
-    handler:^(UIAlertAction* action) {
+  [alert addAction:[UIAlertAction actionWithTitle:DOLCoreLocalizedString(@"Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction* action) {
     finish();
   }]];
-  
-  [self presentViewControllerOnWindow:alert];
+
+  [presenter presentViewController:alert animated:true completion:^{
+    NSLog(@"[Import] Import choices presented");
+  }];
 }
 
 @end

@@ -190,7 +190,19 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
   }
   
   if (_pickerType == DOLSoftwareListDocumentPickerTypeImportSoftware) {
-    [[ImportFileManager shared] importFileAtUrl:urls[0]];
+    NSLog(@"[Import] Files picker returned %lu URL(s)", (unsigned long)urls.count);
+    void (^startImport)(void) = ^{
+      [[ImportFileManager shared] importFileAtUrl:urls[0] presentingViewController:self];
+    };
+    if (controller.isBeingDismissed && controller.transitionCoordinator != nil) {
+      [controller.transitionCoordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        startImport();
+      }];
+    } else if (controller.presentingViewController != nil) {
+      [controller dismissViewControllerAnimated:true completion:startImport];
+    } else {
+      startImport();
+    }
   } else if (_pickerType == DOLSoftwareListDocumentPickerTypeOpenExternal) {
     NSURL* url = urls[0];
     

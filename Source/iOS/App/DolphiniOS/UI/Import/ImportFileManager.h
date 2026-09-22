@@ -13,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (ImportFileManager*)shared;
 
-- (void)importFileAtUrl:(NSURL*)url;
+- (void)importFileAtUrl:(NSURL*)url presentingViewController:(UIViewController*)presenter;
 
 @end
 
