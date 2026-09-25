@@ -6,6 +6,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #import "Core/Config/MainSettings.h"
+#import "Core/State.h"
 
 #import "Swift.h"
 
@@ -26,6 +27,10 @@
 
 - (void)viewDidLoad {
   [super viewDidLoad];
+
+  self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+      initWithTitle:@"Legacy State" style:UIBarButtonItemStylePlain
+      target:self action:@selector(showExperimentalLegacyStateOptions)];
   
   self.fastmemSwitch.on = Config::Get(Config::MAIN_FASTMEM);
   self.fastmemSwitch.enabled = [FastmemManager shared].fastmemAvailable;
@@ -103,6 +108,27 @@
   if ([StikJITManager shared].jitLaunchMode == JITLaunchModeBuiltInStikJIT) {
     [self detectTXM];
   }
+}
+
+- (void)showExperimentalLegacyStateOptions {
+  const bool enabled = State::IsExperimentalIOSJB1780da7Enabled();
+  NSString* message = [NSString stringWithFormat:
+      @"1780da7 bypass is %@. This experimental option only skips the version check for Dolphin [ios-jb] 1780da7. It does not convert the state format. Loading may fail, crash, or corrupt game saves. Only load a COPY of the savestate and back up memory cards and Wii saves first. The option resets to OFF when the app restarts.",
+      enabled ? @"ON" : @"OFF"];
+  UIAlertController* alert = [UIAlertController
+      alertControllerWithTitle:@"Experimental Legacy State" message:message
+      preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+  if (enabled) {
+    [alert addAction:[UIAlertAction actionWithTitle:@"Turn Off" style:UIAlertActionStyleDefault handler:^(UIAlertAction*) {
+      State::SetExperimentalIOSJB1780da7Enabled(false);
+    }]];
+  } else {
+    [alert addAction:[UIAlertAction actionWithTitle:@"Enable for Copies Only" style:UIAlertActionStyleDestructive handler:^(UIAlertAction*) {
+      State::SetExperimentalIOSJB1780da7Enabled(true);
+    }]];
+  }
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)fastmemChanged {

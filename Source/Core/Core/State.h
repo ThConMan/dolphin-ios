@@ -86,6 +86,11 @@ void Shutdown();
 
 void EnableCompression(bool compression);
 
+// Experimental version-check bypass for one legacy iOS revision. Off on process startup;
+// not persisted and does not convert the serialized state format. Use only with backups.
+void SetExperimentalIOSJB1780da7Enabled(bool enabled);
+bool IsExperimentalIOSJB1780da7Enabled();
+
 bool ReadHeader(const std::string& filename, StateHeader& header);
 
 // Returns a string containing information of the savestate in the given slot

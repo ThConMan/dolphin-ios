@@ -4,6 +4,7 @@
 #include "Core/State.h"
 
 #include <algorithm>
+#include <atomic>
 #include <condition_variable>
 #include <filesystem>
 #include <locale>
@@ -65,6 +66,17 @@ static const u32 OUT_LEN = IN_LEN + (IN_LEN / 16) + 64 + 3;
 static unsigned char __LZO_MMODEL out[OUT_LEN];
 
 static AfterLoadCallbackFunc s_on_after_load_callback;
+static std::atomic<bool> s_allow_experimental_ios_jb_1780da7{false};
+
+void SetExperimentalIOSJB1780da7Enabled(bool enabled)
+{
+  s_allow_experimental_ios_jb_1780da7.store(enabled);
+}
+
+bool IsExperimentalIOSJB1780da7Enabled()
+{
+  return s_allow_experimental_ios_jb_1780da7.load();
+}
 
 // Temporary undo state buffer
 static Common::UniqueBuffer<u8> s_undo_load_buffer;
@@ -720,8 +732,7 @@ static bool ValidateHeaders(const StateHeader& header)
     return false;
   }
 
-  // Check both the state version and the revision string
-  std::string current_str = Common::GetScmRevStr();
+  // Check the serialized state version, not the build's revision string.
   std::string loaded_str = header.version_string;
   const u32 loaded_version = header.version_header.version_cookie - COOKIE_BASE;
 
@@ -738,7 +749,15 @@ static bool ValidateHeaders(const StateHeader& header)
   }
   else if (loaded_version != STATE_VERSION)
   {
-    success = false;
+    success = IsExperimentalIOSJB1780da7Enabled() &&
+              header.version_string == "Dolphin [ios-jb] 1780da7";
+    if (success)
+    {
+      Core::DisplayMessage(
+          "Experimental 1780da7 state load: version check bypassed, not converted. "
+          "Use only a copy; crashes or save corruption are possible.",
+          OSD::Duration::NORMAL);
+    }
   }
 
   if (!success)
