@@ -18,15 +18,24 @@ class JitWaitViewController: UIViewController {
 
     switch StikJITManager.shared.jitLaunchMode {
     case .waitForDebugger:
+      if JitManager.shared().acquisitionError == nil {
+        JitManager.shared().acquisitionError = "JIT Launch Mode is set to Wait for Debugger, so built-in JIT has not started. To use Built-in StikJIT, import this device's pairing file and select Built-in StikJIT in Settings > Debug. It requires iOS 17.4 or later, LocalDevVPN, and an installation signed with get-task-allow."
+      }
       break
     case .externalStikDebug:
       JitManager.shared().acquireJitByStikDebugURLScheme()
     case .builtInStikJIT:
-      guard #available(iOS 17.4, *),
-            !StikJITManager.shared.isRunningInLiveContainer,
-            StikJITManager.shared.hasPairingFile else {
-        StikJITManager.shared.jitLaunchMode = .waitForDebugger
-        return
+      guard #available(iOS 17.4, *) else {
+        JitManager.shared().acquisitionError = "Built-in StikJIT requires iOS 17.4 or later."
+        break
+      }
+      guard !StikJITManager.shared.isRunningInLiveContainer else {
+        JitManager.shared().acquisitionError = "Built-in StikJIT cannot run inside LiveContainer."
+        break
+      }
+      guard StikJITManager.shared.hasPairingFile else {
+        JitManager.shared().acquisitionError = "Built-in StikJIT needs this device's pairing file. Import it in Settings > Debug, connect LocalDevVPN, then launch the game again. Your selected JIT mode has been preserved."
+        break
       }
       JitManager.shared().acquireJitByStikJIT()
     }

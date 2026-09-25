@@ -105,15 +105,6 @@
   }
 }
 
-- (void)viewWillDisappear:(BOOL)animated {
-  [super viewWillDisappear:animated];
-
-  BOOL isLeavingSettings = self.isMovingFromParentViewController || self.isBeingDismissed || self.navigationController.isBeingDismissed;
-  if (isLeavingSettings && [StikJITManager shared].jitLaunchMode == JITLaunchModeBuiltInStikJIT && ![StikJITManager shared].hasPairingFile) {
-    [StikJITManager shared].jitLaunchMode = JITLaunchModeWaitForDebugger;
-  }
-}
-
 - (void)fastmemChanged {
   Config::SetBaseOrCurrent(Config::MAIN_FASTMEM, self.fastmemSwitch.on);
 }
@@ -135,7 +126,7 @@
     break;
   case JITLaunchModeBuiltInStikJIT:
     selectedTitle = @"Built-in StikJIT";
-    self.jitLaunchModeInfoLabel.text = @"Before launching a game, connect to a nearby Wi-Fi network and LocalDevVPN. If Wi-Fi is unavailable, enable Cellular Data, connect to LocalDevVPN, then enable Airplane Mode before launching the game. Built-in StikJIT does not work inside LiveContainer. A valid pairing file is required to use Built-in StikJIT. If one is not imported, Dolphin will revert to “Wait for Debugger” when you leave this screen.";
+    self.jitLaunchModeInfoLabel.text = @"Before launching a game, connect to a nearby Wi-Fi network and LocalDevVPN. If Wi-Fi is unavailable, enable Cellular Data, connect to LocalDevVPN, then enable Airplane Mode before launching the game. Built-in StikJIT does not work inside LiveContainer. Import a valid pairing file for this device. The installed app must be signed with get-task-allow; if its signing profile does not permit this entitlement, reinstall with a compatible signing method. Missing setup will show an error without changing your selected mode.";
     break;
   case JITLaunchModeWaitForDebugger:
   default:
@@ -388,10 +379,11 @@
     [sharedMotion setMotionEnabled:true];
 #endif
   } else if (indexPath.section == 3 && indexPath.row == 5) {
-    NSArray<UTType*>* contentTypes = @[[UTType typeWithIdentifier:@"public.data"]];
+    NSArray<UTType*>* contentTypes = @[UTTypeData];
 
-    UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes];
+    UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:YES];
     picker.delegate = self;
+    picker.allowsMultipleSelection = false;
 
     [self presentViewController:picker animated:true completion:nil];
   } else if (indexPath.section == 3 && indexPath.row == 6) {
@@ -404,34 +396,37 @@
 }
 
 - (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
-  NSURL* url = urls.firstObject;
+  void (^importSelection)(void) = ^{
+    // Copy mode returns a local file that does not need a security scope.
+    NSURL* url = urls.firstObject;
+    NSError* error = nil;
+    if (url != nil) {
+      [[StikJITManager shared] importPairingFile:url error:&error];
+    }
 
-  if (url == nil) {
-    return;
+    if (url == nil || error != nil) {
+      NSString* message = url == nil ? @"Files returned no pairing file. Download the file in Files and try again." : [NSString stringWithFormat:@"Failed to import pairing file: %@", error.localizedDescription];
+      UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:@"Error" message:message preferredStyle:UIAlertControllerStyleAlert];
+      [errorAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+      [self presentViewController:errorAlert animated:true completion:nil];
+      return;
+    }
+
+    self.importPairingFileStatusLabel.text = [StikJITManager shared].pairingFileDisplayName;
+    [[DDIManager shared] invalidateReadiness];
+    [self refreshPreparationStatus];
+    [self refreshJITLaunchMode];
+  };
+
+  if (controller.isBeingDismissed && controller.transitionCoordinator != nil) {
+    [controller.transitionCoordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+      importSelection();
+    }];
+  } else if (controller.presentingViewController != nil) {
+    [controller dismissViewControllerAnimated:true completion:importSelection];
+  } else {
+    importSelection();
   }
-
-  if (![url startAccessingSecurityScopedResource]) {
-    return;
-  }
-
-  NSError* error = nil;
-  [[StikJITManager shared] importPairingFile:url error:&error];
-
-  [url stopAccessingSecurityScopedResource];
-
-  if (error != nil) {
-    UIAlertController* errorAlert = [UIAlertController alertControllerWithTitle:@"Error" message:[NSString stringWithFormat:@"Failed to import pairing file: %@", [error localizedDescription]] preferredStyle:UIAlertControllerStyleAlert];
-
-    [errorAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-
-    [self presentViewController:errorAlert animated:true completion:nil];
-
-    return;
-  }
-
-  self.importPairingFileStatusLabel.text = [StikJITManager shared].pairingFileDisplayName;
-  [[DDIManager shared] invalidateReadiness];
-  [self refreshPreparationStatus];
 }
 
 @end

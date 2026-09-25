@@ -68,11 +68,9 @@ private let kStikJITFolderName = "StikJIT"
   }
 
   @objc func importPairingFile(_ sourceURL: URL) throws {
-    if FileManager.default.fileExists(atPath: pairingFileURL.path) {
-      try FileManager.default.removeItem(at: pairingFileURL)
-    }
-
-    try FileManager.default.copyItem(at: sourceURL, to: pairingFileURL)
+    let pairingData = try Data(contentsOf: sourceURL)
+    try FileManager.default.createDirectory(at: pairingFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try pairingData.write(to: pairingFileURL, options: .atomic)
     UserDefaults.standard.set(sourceURL.lastPathComponent, forKey: kPairingFileDisplayNameDefaultsKey)
   }
 }

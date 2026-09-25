@@ -32,6 +32,7 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
 @implementation SoftwareListiOSViewController {
   DOLSoftwareListDocumentPickerType _pickerType;
   NSURL* _openedUrl;
+  __weak UIDocumentPickerViewController* _pendingImportPicker;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -141,6 +142,12 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
 }
 
 - (void)openDocumentPickerWithSoftwareContentTypesAndPickerType:(DOLSoftwareListDocumentPickerType)pickerType {
+  if (pickerType == DOLSoftwareListDocumentPickerTypeImportSoftware) {
+    // Providers may identify disc images as generic data instead of our custom UTIs.
+    [self openDocumentPickerWithContentTypes:@[UTTypeData] pickerType:pickerType];
+    return;
+  }
+
   NSMutableArray<UTType*>* types = [NSMutableArray arrayWithArray:@[
     [UTType exportedTypeWithIdentifier:@"me.oatmealdome.dolphinios.generic-software"],
     [UTType exportedTypeWithIdentifier:@"me.oatmealdome.dolphinios.gamecube-software"],
@@ -168,8 +175,37 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
   pickerController.allowsMultipleSelection = false;
   
   _pickerType = pickerType;
-  
-  [self presentViewController:pickerController animated:true completion:nil];
+
+  _pendingImportPicker = importCopy ? pickerController : nil;
+  __weak SoftwareListiOSViewController* weakSelf = self;
+  __weak UIDocumentPickerViewController* weakPicker = pickerController;
+  [self presentViewController:pickerController animated:true completion:^{
+    if (!importCopy) {
+      return;
+    }
+    NSLog(@"[Import] Files picker presented (data files, copy mode)");
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 45 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+      SoftwareListiOSViewController* owner = weakSelf;
+      UIDocumentPickerViewController* picker = weakPicker;
+      if (owner == nil || picker == nil || owner->_pendingImportPicker != picker ||
+          picker.presentingViewController == nil || picker.isBeingDismissed ||
+          picker.presentedViewController != nil) {
+        return;
+      }
+      UIAlertController* help = [UIAlertController alertControllerWithTitle:@"Waiting for Files"
+        message:@"Files has not returned a selected file yet. If you already tapped a game, a cloud download may still be running. You can keep waiting, or cancel, download the file in Files, and try again. You can also copy it to On My iPhone before retrying. No file has been imported yet."
+        preferredStyle:UIAlertControllerStyleAlert];
+      [help addAction:[UIAlertAction actionWithTitle:@"Continue Browsing" style:UIAlertActionStyleDefault handler:nil]];
+      [picker presentViewController:help animated:true completion:nil];
+    });
+  }];
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller {
+  if (_pendingImportPicker == controller) {
+    _pendingImportPicker = nil;
+    NSLog(@"[Import] Files picker cancelled without a selection");
+  }
 }
 
 - (IBAction)addButtonPressed:(id)sender {
@@ -186,14 +222,24 @@ typedef NS_ENUM(NSInteger, DOLSoftwareListDocumentPickerType) {
     [self presentViewController:errorAlert animated:true completion:nil];
   };
 
-  if (urls.count == 0) {
+  if (urls.count == 0 && _pickerType != DOLSoftwareListDocumentPickerTypeImportSoftware) {
     showError(@"No software file was selected.");
     return;
   }
   
   if (_pickerType == DOLSoftwareListDocumentPickerTypeImportSoftware) {
+    _pendingImportPicker = nil;
     NSLog(@"[Import] Files picker returned %lu URL(s)", (unsigned long)urls.count);
     void (^startImport)(void) = ^{
+      if (urls.count == 0) {
+        showError(@"Files returned no software file. Download the file in Files and try again.");
+        return;
+      }
+      NSArray<NSString*>* extensions = @[@"iso", @"rvz", @"gcm", @"gcz", @"tgc", @"wia", @"wbfs", @"ciso", @"wad", @"dol", @"elf"];
+      if (![extensions containsObject:urls[0].pathExtension.lowercaseString]) {
+        showError(@"Choose a supported game file: ISO, RVZ, GCM, GCZ, TGC, WIA, WBFS, CISO, WAD, DOL, or ELF. Extract ZIP or 7z archives first.");
+        return;
+      }
       [[ImportFileManager shared] importCopiedFileAtUrl:urls[0] presentingViewController:self];
     };
     if (controller.isBeingDismissed && controller.transitionCoordinator != nil) {
