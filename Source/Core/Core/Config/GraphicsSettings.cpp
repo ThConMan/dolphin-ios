@@ -99,8 +99,14 @@ const Info<int> GFX_COMMAND_BUFFER_EXECUTE_INTERVAL{
     {System::GFX, "Settings", "CommandBufferExecuteInterval"}, 100};
 
 const Info<bool> GFX_SHADER_CACHE{{System::GFX, "Settings", "ShaderCache"}, true};
+#if defined(IPHONEOS)
+// Compile known shaders before gameplay rather than competing with emulation on mobile CPUs.
+constexpr bool DEFAULT_WAIT_FOR_SHADERS = true;
+#else
+constexpr bool DEFAULT_WAIT_FOR_SHADERS = false;
+#endif
 const Info<bool> GFX_WAIT_FOR_SHADERS_BEFORE_STARTING{
-    {System::GFX, "Settings", "WaitForShadersBeforeStarting"}, false};
+    {System::GFX, "Settings", "WaitForShadersBeforeStarting"}, DEFAULT_WAIT_FOR_SHADERS};
 const Info<ShaderCompilationMode> GFX_SHADER_COMPILATION_MODE{
     {System::GFX, "Settings", "ShaderCompilationMode"}, ShaderCompilationMode::Synchronous};
 const Info<int> GFX_SHADER_COMPILER_THREADS{{System::GFX, "Settings", "ShaderCompilerThreads"}, 1};
